@@ -3,7 +3,10 @@
 #![no_std]
 #![no_main]
 
+use arduino_hal::port::mode::{Input, Output, PullUp};
+use arduino_hal::port::Pin;
 use arduino_hal::{DefaultClock, Delay, I2c, Usart};
+use avr_device::atmega328p::portb::PINB;
 use avr_device::atmega328p::TWI;
 use core::ascii::Char;
 use embedded_hal::delay::DelayNs;
@@ -164,12 +167,12 @@ fn update_deck_display(state: &DeckState, lcd: &mut LocalDisplay, mut buffer: [u
     lcd.write_graph_to_pos(if state.is_micro_on { 0 } else { 1 }, (0, 0));
     lcd.write_graph_to_pos(6, (1, 0));
     // lcd.write_char_to_pos('=', (1, 0));
-    lcd.write_str_to_pos(if state.is_micro_on { "ON" } else { "OFF" }, (2, 0));
+    lcd.write_str_to_pos(if state.is_micro_on { "ON " } else { "OFF" }, (2, 0));
 
     //Microphone status
     lcd.write_graph_to_pos(if state.is_live { 2 } else { 7 }, (0, 1));
     //Live status
-    lcd.write_str_to_pos(if state.is_live { "LIVE" } else { "offl" }, (1, 1));
+    lcd.write_str_to_pos(if state.is_live { "LIVE" } else { "----" }, (1, 1));
 
     //Separators
     lcd.write_graph_to_pos(5, (5, 0));
@@ -202,6 +205,14 @@ fn update_deck_display(state: &DeckState, lcd: &mut LocalDisplay, mut buffer: [u
     );
 }
 
+fn set_button_led(is_micro_on: bool, button_led: &mut Pin<Output, arduino_hal::port::D2>) {
+    if !is_micro_on {
+        button_led.set_high();
+    } else {
+        button_led.set_low();
+    }
+}
+
 #[arduino_hal::entry]
 fn main() -> ! {
     let dp = arduino_hal::Peripherals::take().unwrap();
@@ -210,7 +221,7 @@ fn main() -> ! {
 
     uwriteln!(&mut serial, "--Init--").unwrap();
 
-    let mut i2c_bus = I2c::new(dp.TWI, pins.a4.into_pull_up_input(), pins.a5.into_pull_up_input(), 40000);
+    let mut i2c_bus = I2c::new(dp.TWI, pins.a4.into_pull_up_input(), pins.a5.into_pull_up_input(), 750000);
     // let i2c_bus = embedded_hal_bus::i2c::CriticalSectionDevice::new(i2c);
 
     let mut sender = I2cSender::new(&mut i2c_bus, 0x27);
@@ -224,8 +235,10 @@ fn main() -> ! {
     let mut lcd = Lcd::new(&mut sender, &mut delay, lcd_config, None);
 
     let mut led = pins.d13.into_output();
+    let mut button_led: Pin<Output, arduino_hal::port::D2> = pins.d2.into_output();
+    let button_1 = pins.d3.into_pull_up_input();
 
-    lcd.clean_display();
+    // lcd.clean_display();
     lcd.return_home();
     lcd.set_cursor_blink_state(State::Off);
     lcd.set_cursor_state(State::Off);
@@ -238,36 +251,63 @@ fn main() -> ! {
     write_custom_chars_to_cgram(&mut lcd); // Load custom chars
 
     update_deck_display(&state, &mut lcd, buffer);
+    led.toggle();
 
     loop {
-        if (i < 999) {
-            i = i + 2;
+        // if (i < 999) {
+        //     i = i + 2;
+        // }
+        //
+        // if (j < 999) {
+        //     j = j + 1;
+        // }
+
+        if button_1.is_low() {
+            uwriteln!(&mut serial, "low = {}", i).unwrap();
+
+            if (i < 999) {
+                i = i + 2;
+            }
+
+            if (j < 999) {
+                j = j + 1;
+            }
+
+            state.update(DeckState {
+                is_live: true,
+                is_micro_on: true,
+                followers: i,
+                viewers: j,
+            });
+        } else {
+            uwriteln!(&mut serial, "high = {}", i).unwrap();
+
+            state.update(DeckState {
+                is_live: false,
+                is_micro_on: false,
+                followers: i,
+                viewers: j,
+            });
         }
 
-        if (j < 999) {
-            j = j + 1;
-        }
-
-        state.update(DeckState {
-            is_live: true,
-            is_micro_on: false,
-            followers: i,
-            viewers: j,
-        });
+        // state.update(DeckState {
+        //     is_live: true,
+        //     is_micro_on: false,
+        //     followers: i,
+        //     viewers: j,
+        // });
         update_deck_display(&state, &mut lcd, buffer);
+        // set_button_led(state.is_micro_on, &mut button_led);
 
-        uwriteln!(&mut serial, "{}", i).unwrap();
+        uwriteln!(&mut serial, "i = {}", i).unwrap();
 
-        led.toggle();
-        arduino_hal::delay_ms(1000);
-
-        state.update(DeckState {
-            is_live: false,
-            is_micro_on: true,
-            followers: i,
-            viewers: j,
-        });
+        // state.update(DeckState {
+        //     is_live: false,
+        //     is_micro_on: true,
+        //     followers: i,
+        //     viewers: j,
+        // });
         update_deck_display(&state, &mut lcd, buffer);
-        arduino_hal::delay_ms(1000);
+        set_button_led(state.is_micro_on, &mut button_led);
     }
 }
