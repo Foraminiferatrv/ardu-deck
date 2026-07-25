@@ -21,6 +21,9 @@ log = "0.4.25"
 defmt = "1.1.1"
 avr-device = "0.8.1"
 embedded-hal-bus = "0.3.0"
+lcd1602-driver = "0.3.0"
+heapless = "0.9.3"
+numtoa = "1.0.0"
 
 
 [dependencies.arduino-hal]

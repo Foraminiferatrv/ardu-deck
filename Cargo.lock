@@ -26,10 +26,13 @@ dependencies = [
  "defmt",
  "embedded-hal 1.0.0",
  "embedded-hal-bus 0.3.0",
+ "heapless",
  "i2c-character-display",
+ "lcd1602-driver",
  "lcd_1602_i2c",
  "log",
  "nb 1.1.0",
+ "numtoa",
  "panic-halt",
  "ufmt",
 ]
@@ -150,6 +153,12 @@ dependencies = [
  "memchr",
  "serde_core",
 ]
+
+[[package]]
+name = "byteorder"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "cfg-if"
@@ -312,6 +321,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hash32"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47d60b12902ba28e2730cd37e95b8c9223af2808df9e902d4df49588d1470606"
+dependencies = [
+ "byteorder",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -333,6 +351,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7382cf6263419f2d8df38c55d7da83da5c18aef87fc7a7fc1fb1e344edfe14c1"
 dependencies = [
  "hashbrown 0.15.5",
+]
+
+[[package]]
+name = "heapless"
+version = "0.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25ba4bd83f9415b58b4ed8dc5714c76e626a105be4646c02630ad730ad3b5aa4"
+dependencies = [
+ "hash32",
+ "stable_deref_trait",
 ]
 
 [[package]]
@@ -475,6 +503,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lcd1602-driver"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4de8b0872338ba6a6e25e41e7ba294b4d90ca1a25faedf2dd8c748d0b002839"
+dependencies = [
+ "embedded-hal 1.0.0",
+]
+
+[[package]]
 name = "lcd_1602_i2c"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -524,6 +561,12 @@ checksum = "b9985ef7269fa99f3b12437bb698381da2428743ab90f20393f399fa14cab21a"
 dependencies = [
  "windows-sys",
 ]
+
+[[package]]
+name = "numtoa"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e4d8a81ede501fad07191e746a299f4d79f6dcd053bab1b97af4ff5a90099f2"
 
 [[package]]
 name = "once_cell"
