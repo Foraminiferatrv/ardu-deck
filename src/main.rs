@@ -134,6 +134,73 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 //         Result::Ok(())
 //     }
 // }
+#[derive(Default)]
+struct DeckState {
+    is_micro_on: bool,
+    is_live: bool,
+    viewers: i16,
+    followers: i16,
+}
+
+impl DeckState {
+    fn update(&mut self, new_state: DeckState) {
+        *self = new_state
+    }
+
+    fn toggle_micro(&mut self) {
+        self.is_micro_on = !self.is_micro_on;
+    }
+
+    fn set_micro(&mut self, new_val: bool) {
+        self.is_micro_on = new_val;
+    }
+
+    fn set_live(&mut self, new_val: bool) {
+        self.is_micro_on = new_val;
+    }
+}
+fn update_deck_display(state: &DeckState, lcd: &mut LocalDisplay, mut buffer: [u8; 20]) {
+    //Microphone status
+    lcd.write_graph_to_pos(if state.is_micro_on { 0 } else { 1 }, (0, 0));
+    lcd.write_graph_to_pos(6, (1, 0));
+    // lcd.write_char_to_pos('=', (1, 0));
+    lcd.write_str_to_pos(if state.is_micro_on { "ON" } else { "OFF" }, (2, 0));
+
+    //Microphone status
+    lcd.write_graph_to_pos(if state.is_live { 2 } else { 7 }, (0, 1));
+    //Live status
+    lcd.write_str_to_pos(if state.is_live { "LIVE" } else { "offl" }, (1, 1));
+
+    //Separators
+    lcd.write_graph_to_pos(5, (5, 0));
+    lcd.write_graph_to_pos(5, (5, 1));
+    lcd.write_graph_to_pos(5, (11, 0));
+    lcd.write_graph_to_pos(5, (11, 1));
+
+    //Vievers
+    lcd.write_graph_to_pos(3, (6, 0));
+    lcd.write_char_to_pos('=', (7, 0));
+    lcd.write_str_to_pos(
+        if state.viewers < 999 {
+            state.viewers.numtoa_str(10, &mut buffer)
+        } else {
+            "999"
+        },
+        (8, 0),
+    );
+
+    //Vievers
+    lcd.write_graph_to_pos(4, (6, 1));
+    lcd.write_char_to_pos('=', (7, 1));
+    lcd.write_str_to_pos(
+        if state.followers < 999 {
+            state.followers.numtoa_str(10, &mut buffer)
+        } else {
+            "999"
+        },
+        (8, 1),
+    );
+}
 
 #[arduino_hal::entry]
 fn main() -> ! {
@@ -163,193 +230,44 @@ fn main() -> ! {
     lcd.set_cursor_blink_state(State::Off);
     lcd.set_cursor_state(State::Off);
 
-    let mut buffer = [0u8; 20];
-    let mut i: i32 = 0;
-
-    let mut is_micro_on = true;
-    let mut is_live = false;
-    let mut viewers: i16 = 3000;
-    let mut followers: i16 = 10;
+    let mut state = DeckState::default();
+    let buffer = [0u8; 20];
+    let mut i: i16 = 0;
+    let mut j: i16 = 0;
 
     write_custom_chars_to_cgram(&mut lcd); // Load custom chars
 
-    //Microphone status
-    lcd.write_graph_to_pos(0, (0, 0));
-    lcd.write_graph_to_pos(6, (1, 0));
-    // lcd.write_char_to_pos('=', (1, 0));
-    lcd.write_str_to_pos(if is_micro_on { "ON" } else { "OFF" }, (2, 0));
+    update_deck_display(&state, &mut lcd, buffer);
 
-    //Microphone status
-    lcd.write_graph_to_pos(if is_live { 2 } else { 7 }, (0, 1));
-    //Live status
-    lcd.write_str_to_pos(if is_live { "LIVE" } else { "offl" }, (1, 1));
-
-    //Separators
-    lcd.write_graph_to_pos(5, (5, 0));
-    lcd.write_graph_to_pos(5, (5, 1));
-    lcd.write_graph_to_pos(5, (11, 0));
-    lcd.write_graph_to_pos(5, (11, 1));
-
-    //Vievers
-    lcd.write_graph_to_pos(3, (6, 0));
-    lcd.write_char_to_pos('=', (7, 0));
-    lcd.write_str_to_pos(if viewers < 999 { viewers.numtoa_str(10, &mut buffer) } else { "999" }, (8, 0));
-
-    //Vievers
-    lcd.write_graph_to_pos(4, (6, 1));
-    lcd.write_char_to_pos('=', (7, 1));
-    lcd.write_str_to_pos(if followers < 999 { followers.numtoa_str(10, &mut buffer) } else { "999" }, (8, 1));
-
-    // lcd.write_graph_to_pos(1, (1, 1));
-    // lcd.write_graph_to_pos(2, (2, 1));
-    // lcd.write_graph_to_pos(3, (3, 1));
-    // lcd.write_graph_to_pos(4, (4, 1));
-    // lcd.write_graph_to_pos(5, (5, 1));
-    // lcd.write_graph_to_pos(6, (6, 1));
-    // lcd.write_graph_to_pos(7, (7, 1));
-
-    // lcd.write_byte_to_pos(0, (0, 1));
-    // lcd.write_byte_to_pos(1, (1, 1));
-    // lcd.write_byte_to_pos(2, (2, 1));
-    // lcd.write_byte_to_pos(3, (3, 1));
-    // lcd.write_byte_to_pos(4, (4, 1));
-    // lcd.write_byte_to_pos(5, (5, 1));
-    // lcd.write_byte_to_pos(6, (6, 1));
-    // lcd.write_byte_to_pos(7, (7, 1));
-
-    // lcd.write_graph_to_cgram(0, &graph);
-    // lcd.write_graph_to_pos(0, (0, 0));
-    //
-    // lcd.write_graph_to_cgram(4, &graph_i);
-    // lcd.write_graph_to_pos(4, (1, 0));
-
-    ///TEST////
-    //     lcd.write_graph_to_cgram(0, &HEART);
-
-    //     // to test cgram read
-    //     // read heart graph from CGRAM, modify it to a diamond shape, then write it to another CGRAM address
-    //     let mut graph_data = lcd.read_graph_from_cgram(0);
-    //     graph_data.upper[1].set_bit(2);
-    //     graph_data.upper[2].set_bit(2);
-    //     graph_data.lower.as_mut().unwrap()[1].clear_bit(2);
-    //     lcd.write_graph_to_cgram(1, &graph_data);
-    //
-    //     lcd.set_cursor_blink_state(State::On);
-    //
-    //     // to test function works
-    //     // we set cursor 1 step right
-    //     lcd.set_cursor_pos((1, 0));
-    //
-    //     // type writer effect
-    //     lcd.typewriter_write("hello,", 250_000);
-    //
-    //     // relative cursor move
-    //     lcd.offset_cursor_pos((1, 0));
-    //
-    //     // to test write string to cur pos
-    //     lcd.write_str_to_cur("world!");
-    //
-    //     // manually delay
-    //     lcd.delay_ms(250);
-    //
-    //     let line_capacity = lcd.get_line_capacity();
-    //
-    //     // to test write character to specified position
-    //     // since tilde character (~) is not in CGROM of LCD1602A
-    //     // it should be displayed as a full rectangle
-    //     lcd.write_char_to_pos('~', (15, 0));
-    //
-    //     // manually delay
-    //     lcd.delay_ms(250);
-    //
-    //     // to test whether line break works well
-    //     // set cursor to the end of first line, and write a vertical line
-    //     lcd.set_cursor_pos((line_capacity - 1, 0));
-    //     lcd.write_char_to_cur('|');
-    //
-    //     // turn off cursor blinking, so that cursor will only be a underline
-    //     lcd.set_cursor_blink_state(State::Off);
-    //
-    //     lcd.typewriter_write("Hello, ", 250_000);
-    //
-    //     // to test right to left write in
-    //     // move cursor to left end of display window, then type string in reverse order
-    //     lcd.set_direction(MoveDirection::RightToLeft);
-    //     lcd.set_cursor_pos((15, 1));
-    //     lcd.typewriter_write("~!", 250_000);
-    //     // and the 2 type of split flap display effect
-    //     lcd.split_flap_write("2061", FlipStyle::Simultaneous, None, 150_000, None);
-    //     lcd.split_flap_write("DCL", FlipStyle::Sequential, Some(10), 150_000, Some(250_000));
-    //
-    //     lcd.set_cursor_state(State::Off);
-    //
-    //     // replace 2 rectangle with custom heart shape and diamond shape
-    //     lcd.delay_ms(1_000);
-    //     lcd.write_graph_to_pos(0, (15, 0));
-    //     lcd.delay_ms(1_000);
-    //     // although we define diamond shape as index 1 above,
-    //     // but since we define shape in 5x11 Font, and read as 5x8 Font, the actual index should be 1*2 = 2.
-    //     lcd.write_graph_to_pos(2, (15, 1));
-    //
-    //     // to test read from DDRAM
-    //     // read from first line end, and write same character to the second line end
-    //     let char_at_end = lcd.read_byte_from_pos((39, 0));
-    //     lcd.write_byte_to_pos(char_at_end, (39, 1));
-    //
-    //     // shift display window
-    //     lcd.delay_ms(1_000);
-    //     lcd.shift_display_to_pos(2, MoveStyle::Shortest, State::On, 250_000);
-    //     lcd.delay_ms(1_000);
-    //     lcd.shift_display_to_pos(40 - 2, MoveStyle::Shortest, State::On, 250_000);
-    //     lcd.delay_ms(1_000);
-    //     lcd.shift_display_to_pos(0, MoveStyle::Shortest, State::On, 250_000);
-    //
-    //     // and blinking display 3 times
-    //     lcd.delay_ms(1_000);
-    //     lcd.full_display_blink(3, 500_000);
-    //
-    //     // and blinking backlight 3 times
-    //     for _ in 0..3 {
-    //         lcd.delay_ms(500);
-    //         lcd.set_backlight(State::Off);
-    //         lcd.delay_ms(500);
-    //         lcd.set_backlight(State::On);
-    //     }
-    //
-    //     // Set the font to Font5x11, and clean screen, and write a few words.
-    //     lcd.delay_ms(1_000);
-    //     lcd.set_line_mode(lcd1602_driver::command::LineMode::OneLine);
-    //     lcd.set_font(lcd1602_driver::command::Font::Font5x11);
-    //     lcd.clean_display();
-    //     lcd.return_home();
-    //     lcd.set_cursor_blink_state(State::On);
-    //
-    //     lcd.write_graph_to_cur(0);
-    //     lcd.typewriter_write("Hello, BigFont", 200_000);
-    //     lcd.write_graph_to_cur(1);
-    ///TEST////
-    // draw_cells(&LIVE, (0, 0), &mut lcd).unwrap();
     loop {
-        // lcd.write_str_to_pos(i.numtoa_str(10, &mut buffer), (0, 1));
         if (i < 999) {
-            i = i + 1;
+            i = i + 2;
         }
 
-        // lcd.write_graph_to_pos(0, (0, 0));
+        if (j < 999) {
+            j = j + 1;
+        }
+
+        state.update(DeckState {
+            is_live: true,
+            is_micro_on: false,
+            followers: i,
+            viewers: j,
+        });
+        update_deck_display(&state, &mut lcd, buffer);
 
         uwriteln!(&mut serial, "{}", i).unwrap();
 
-        // let _ = (0..CHARS_ARR_LENGTH).zip(CUSTOM_CHARS).map(|(i, char)| {
-        //     let graph = CGRAMGraph { upper: char, lower: None };
-        //     uwriteln!(&mut serial, "--III--: {}", i).unwrap();
-        //
-        // });
-
         led.toggle();
+        arduino_hal::delay_ms(1000);
 
-        // lcd.write_str_to_pos(st.as_str(), (2, 0));
-        // i = i + 1;
-
+        state.update(DeckState {
+            is_live: false,
+            is_micro_on: true,
+            followers: i,
+            viewers: j,
+        });
+        update_deck_display(&state, &mut lcd, buffer);
         arduino_hal::delay_ms(1000);
     }
 }
