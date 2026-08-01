@@ -15,15 +15,14 @@ panic-halt = "1.0.0"
 ufmt = "0.2.0"
 nb = "1.1.0"
 embedded-hal = "1.0"
-lcd_1602_i2c = "0.3.0"
-i2c-character-display =  { version = "0.5.1", features = ["ufmt"] }
+i2c-character-display = { version = "0.5.1", features = ["ufmt"] }
 log = "0.4.25"
-defmt = "1.1.1"
-avr-device = "0.8.1"
+avr-device = { version = "0.8.1", features = ["atmega328p"] }
 embedded-hal-bus = "0.3.0"
 lcd1602-driver = "0.3.0"
-heapless = "0.9.3"
+heapless = { version = "0.9.3", features = ["portable-atomic"] }
 numtoa = "1.0.0"
+#serialmessage = { version = "0.2.0", features = ["default"] }
 
 
 [dependencies.arduino-hal]
