@@ -17,11 +17,12 @@ nb = "1.1.0"
 embedded-hal = "1.0"
 i2c-character-display = { version = "0.5.1", features = ["ufmt"] }
 log = "0.4.25"
-avr-device = { version = "0.8.1", features = ["atmega328p"] }
+avr-device = { version = "0.8.1", features = ["atmega328p", "rt"] }
 embedded-hal-bus = "0.3.0"
 lcd1602-driver = "0.3.0"
 heapless = { version = "0.9.3", features = ["portable-atomic"] }
 numtoa = "1.0.0"
+embedded-io = "0.7.1"
 #serialmessage = { version = "0.2.0", features = ["default"] }
 
 
