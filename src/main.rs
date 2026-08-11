@@ -31,6 +31,9 @@ use nb::block;
 use numtoa::NumToA;
 type CustomCGRAM = [u8; 8];
 type CustomCellChar = (CustomCGRAM, u8);
+
+const BAUDRATE: u32 = 115200;
+
 // static LED_STATE: Mutex<Cell<bool>> = Mutex::new(Cell::new(true));
 const MICROPHONE_0: CustomCGRAM = [0b00100, 0b01010, 0b01010, 0b11011, 0b01010, 0b01010, 0b00100, 0b01110];
 const MICROPHONE_OFF_1: CustomCGRAM = [0b00100, 0b01011, 0b01010, 0b11111, 0b01010, 0b11010, 0b00100, 0b01110];
@@ -52,8 +55,9 @@ const CLOSE_TRANSITION_BYTE: u8 = 36;//$
 static mut RX_QUEUE: Queue<u8, 256> = Queue::new(); // Read buffer
 static mut READ_BUFFER:[u8; 64] = [0u8; 64];
 
-static  DECK_STATE: Mutex<Cell<DeckState>> = Mutex::new(Cell::new(DeckState {followers: 0, is_live: false, is_micro_on:false, viewers:0}));
+// static  DECK_STATE: Mutex<Cell<DeckState>> = Mutex::new(Cell::new(DeckState {followers: 0, is_live: false, is_micro_on:false, viewers:0}));
 static  SERIAL:Mutex<RefCell<Option<Usart0<DefaultClock>>>> = Mutex::new(RefCell::new(Option::None));
+// static STRING_BUFFER:  Cell<[u8;3]> =Cell::new([0u8; 3]);
 
 
 type LocalDisplay<'a, 'b> = Lcd<'a, 'b, I2cSender<'a, I2c, SevenBitAddress>, Delay, true>;
@@ -132,15 +136,21 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
     }
 }
 
-#[derive(Default, Copy, Clone)]
-struct DeckState {
+#[derive(Default)]
+struct DeckState{
     is_micro_on: bool,
     is_live: bool,
-    viewers: i16,
-    followers: i16,
+    // viewers: i16,
+    // followers: i16,
+    viewers:  String<3>,
+    followers: String<3>,
 }
 
 impl DeckState {
+    fn default() -> DeckState{
+        DeckState { is_micro_on: false, is_live: false, viewers: String::<3>::try_from("000").unwrap(), followers: String::<3>::try_from("000").unwrap() }
+    }
+
     fn update(&mut self, new_state: DeckState) {
         *self = new_state
     }
@@ -158,19 +168,19 @@ impl DeckState {
         self.is_live = new_val;
     }
 
-    fn set_viewers(&mut self, new_val: i16) {
-        self.viewers = new_val;
+    fn set_viewers(&mut self, new_val: &String<3>) {
+        self.viewers = new_val.clone();
     }
 
-    fn set_followers(&mut self, new_val: i16) {
-        self.followers = new_val;
+    fn set_followers(&mut self, new_val: &String<3>) {
+        self.followers = new_val.clone();
     }
 }
 
 // fn listen_state(state: &DeckState,lcd: &mut LocalDisplay, )
 
 
-fn update_deck_display(state: &DeckState,lcd: &mut LocalDisplay, mut buffer: [u8; 20]) {
+fn update_deck_display(state: &DeckState,lcd: &mut LocalDisplay) {
     // let state =  interrupt::free(|cs|{
     //    DECK_STATE.borrow(cs).get()
     // });
@@ -197,8 +207,9 @@ fn update_deck_display(state: &DeckState,lcd: &mut LocalDisplay, mut buffer: [u8
     lcd.write_graph_to_pos(3, (6, 0));
     lcd.write_char_to_pos('=', (7, 0));
     lcd.write_str_to_pos(
-        if state.viewers < 999 {
-            state.viewers.numtoa_str(10, &mut buffer)
+        if state.viewers.len() == 3 {
+            // state.viewers.numtoa_str(10, &mut buffer)
+            state.viewers.as_str()
         } else {
             "999"
         },
@@ -209,8 +220,9 @@ fn update_deck_display(state: &DeckState,lcd: &mut LocalDisplay, mut buffer: [u8
     lcd.write_graph_to_pos(4, (6, 1));
     lcd.write_char_to_pos('=', (7, 1));
     lcd.write_str_to_pos(
-        if state.followers < 999 {
-            state.followers.numtoa_str(10, &mut buffer)
+        if state.viewers.len() == 3 {
+            // state.followers.numtoa_str(10, &mut buffer)
+            state.followers.as_str()
         } else {
             "999"
         },
@@ -298,29 +310,26 @@ fn send_button_signal() {}
 //     // });
 // }
 
-const BAUDRATE: u32 = 115200;
 
 
 #[arduino_hal::entry]
 fn main() -> ! {
     let mut state = DeckState::default();
-    let number_to_string_buffer = [0u8; 20]; //Number -> String buffer
+    // let number_to_string_buffer = [0u8; 20]; //Number -> String buffer
     let dp = arduino_hal::Peripherals::take().unwrap();
-    let mut pins = arduino_hal::pins!(dp);
-    let mut rx = pins.d1.into_output();
+    let pins = arduino_hal::pins!(dp);
+    let rx = pins.d1.into_output();
     // let mut serial: Usart0<DefaultClock> = arduino_hal::default_serial!(dp, pins, 115200);
     // let mut usart: Usart0<DefaultClock> = arduino_hal::Usart::new(dp.USART0, pins.d0, rx, arduino_hal::hal::usart::BaudrateExt::into_baudrate(115200));
     let mut serial: Usart0<DefaultClock> = arduino_hal::Usart::new(dp.USART0, pins.d0, rx, arduino_hal::hal::usart::BaudrateExt::into_baudrate(BAUDRATE));
+    let mut string_buffer = String::<3>::new();
+    let mut string_slice_buffer: [u8; 3] = [0u8; 3];
 
     // serial.listen(Event::DataRegisterEmpty);
     // serial.listen(Event::TxComplete);
 
     // SAFETY: We can enable the interrupts here as we are not inside
      // a critical section.
-
-    let mut i: i16 = 0;
-    let mut j: i16 = 0;
-
     // SERIAL.into_inner().set(serial.into());
     //
     //
@@ -363,7 +372,7 @@ fn main() -> ! {
     lcd.return_home();
 
     write_custom_chars_to_cgram(&mut lcd); // Load custom chars
-    update_deck_display( &mut state, &mut lcd, number_to_string_buffer);
+    update_deck_display( &mut state, &mut lcd);
 
     let mut button_led: Pin<Output, arduino_hal::port::D2> = pins.d2.into_output(); // Microphone button LED
     let button_3 = pins.d3.into_pull_up_input(); // Microphone button
@@ -512,17 +521,21 @@ fn main() -> ! {
                     }
 
                     &FOLLOWERS_BYTE=>{
-                        // uwriteln!(&mut serial, "FOLLOWERS_BYTE: {}", byte).unwrap();
+                    let _ = string_buffer.push(read_buffer[i+1].as_ascii().unwrap().to_char());
+                    let _ = string_buffer.push(read_buffer[i+2].as_ascii().unwrap().to_char());
+                    let _ = string_buffer.push(read_buffer[i+3].as_ascii().unwrap().to_char());
+
+                    state.set_followers(&string_buffer);
+                    string_buffer = String::<3>::new();
                     }
 
                     &VIEWERS_BYTE => {
-                        // uwriteln!(&mut serial, "VIEWERS_BYTE: {}", byte).unwrap();
+                        let _ = string_buffer.push(read_buffer[i+1].as_ascii().unwrap().to_char());
+                        let _ = string_buffer.push(read_buffer[i+2].as_ascii().unwrap().to_char());
+                        let _ = string_buffer.push(read_buffer[i+3].as_ascii().unwrap().to_char());
 
-                        // let viewers_count: i16 = read_buffer[1].as_ascii().unwrap_or(0).as_str().parse::<i16>().unwrap_or(0) * 100
-                        //     + read_buffer[2].as_ascii().unwrap_or('0').as_str().parse::<i16>().unwrap_or(0) * 10
-                        //     + read_buffer[3].as_ascii().unwrap_or('0').as_str().parse::<i16>().unwrap_or(0);
-
-                        // state.set_viewers(viewers_count);
+                        state.set_viewers(&string_buffer);
+                        string_buffer = String::<3>::new();
                     }
                     _ => (),
                 }
@@ -534,12 +547,8 @@ fn main() -> ! {
             read_buffer.clear();
 
             uwriteln!(&mut serial, "STATE MIC: {}", state.is_micro_on).unwrap();
-            interrupt::free(|cs|{
 
-            uwriteln!(&mut serial, "Global MIC: {}", DECK_STATE.borrow(cs).get().is_micro_on).unwrap();
-            });
-
-            update_deck_display(&mut state, &mut lcd, number_to_string_buffer);
+            // update_deck_display(&mut state, &mut lcd);
             i = 0;
 
         //State listener
@@ -609,7 +618,7 @@ fn main() -> ! {
             // serial.write(0x39);
         }
 
-        update_deck_display(&mut state, &mut lcd, number_to_string_buffer);
+        update_deck_display(&mut state, &mut lcd);
         set_button_led(state.is_micro_on, &mut button_led);
 
         // if read_buffer.len() <= 13 {
