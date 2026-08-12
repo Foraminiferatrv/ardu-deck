@@ -1,25 +1,19 @@
 #![feature(ascii_char)]
-#![feature(adt_const_params)]
-#![feature(abi_avr_interrupt)]
+// #![feature(adt_const_params)]
+// #![feature(abi_avr_interrupt)]
 #![no_std]
 #![no_main]
 
-// $env:RAVEDUDE_PORT="COM3"
-
-use arduino_hal::hal::usart::{Event, Usart0};
+use arduino_hal::hal::usart::{Usart0};
 use arduino_hal::port::mode::Output;
 use arduino_hal::port::Pin;
-use arduino_hal::prelude::{_embedded_hal_serial_Read, _embedded_hal_serial_Write};
-use arduino_hal::{DefaultClock, Delay, I2c, delay_ms};
-use avr_device::interrupt::{self, Mutex};
-use embedded_hal::delay;
+use arduino_hal::prelude::{_embedded_hal_serial_Read};
+use arduino_hal::{DefaultClock, Delay, I2c};
 use core::ascii::Char;
-use core::cell::{Cell, RefCell};
 use embedded_hal::i2c::SevenBitAddress;
-use heapless::spsc::Queue;
 use heapless::{String, Vec};
 
-use ufmt::uwriteln;
+use ufmt::{uWrite, uwriteln};
 
 use lcd1602_driver::command::{Font, RAMType};
 use lcd1602_driver::{
@@ -27,14 +21,10 @@ use lcd1602_driver::{
     lcd::{self, Basic, CGRAMGraph, Ext, Lcd},
     sender::I2cSender,
 };
-use nb::block;
-use numtoa::NumToA;
 type CustomCGRAM = [u8; 8];
-type CustomCellChar = (CustomCGRAM, u8);
 
 const BAUDRATE: u32 = 115200;
 
-// static LED_STATE: Mutex<Cell<bool>> = Mutex::new(Cell::new(true));
 const MICROPHONE_0: CustomCGRAM = [0b00100, 0b01010, 0b01010, 0b11011, 0b01010, 0b01010, 0b00100, 0b01110];
 const MICROPHONE_OFF_1: CustomCGRAM = [0b00100, 0b01011, 0b01010, 0b11111, 0b01010, 0b11010, 0b00100, 0b01110];
 const CIRCLE_2: CustomCGRAM = [0b00000, 0b00100, 0b01110, 0b11111, 0b01110, 0b00100, 0b00000, 0b00000];
@@ -50,14 +40,10 @@ const MICROPHONE_BYTE: u8 =77;//M
 const LIVE_BYTE: u8 =76;//L
 const VIEWERS_BYTE: u8 =86;//V
 const FOLLOWERS_BYTE: u8 =70;//F
+const HOURS_BYTE: u8 =70;//F
+const MINUTES_BYTE: u8 =70;//F
 const CLOSE_TRANSITION_BYTE: u8 = 36;//$
 
-static mut RX_QUEUE: Queue<u8, 256> = Queue::new(); // Read buffer
-static mut READ_BUFFER:[u8; 64] = [0u8; 64];
-
-// static  DECK_STATE: Mutex<Cell<DeckState>> = Mutex::new(Cell::new(DeckState {followers: 0, is_live: false, is_micro_on:false, viewers:0}));
-static  SERIAL:Mutex<RefCell<Option<Usart0<DefaultClock>>>> = Mutex::new(RefCell::new(Option::None));
-// static STRING_BUFFER:  Cell<[u8;3]> =Cell::new([0u8; 3]);
 
 
 type LocalDisplay<'a, 'b> = Lcd<'a, 'b, I2cSender<'a, I2c, SevenBitAddress>, Delay, true>;
@@ -181,10 +167,6 @@ impl DeckState {
 
 
 fn update_deck_display(state: &DeckState,lcd: &mut LocalDisplay) {
-    // let state =  interrupt::free(|cs|{
-    //    DECK_STATE.borrow(cs).get()
-    // });
-
     //Microphone status
     lcd.write_graph_to_pos(if state.is_micro_on { 0 } else { 1 }, (0, 0));
     lcd.write_graph_to_pos(6, (1, 0));
@@ -198,8 +180,8 @@ fn update_deck_display(state: &DeckState,lcd: &mut LocalDisplay) {
     //Separators
     lcd.write_graph_to_pos(5, (5, 0));
     lcd.write_graph_to_pos(5, (5, 1));
-    // lcd.write_graph_to_pos(5, (11, 0));
-    // lcd.write_graph_to_pos(5, (11, 1));
+    lcd.write_graph_to_pos(5, (11, 0));
+    lcd.write_graph_to_pos(5, (11, 1));
     // lcd.write_char_to_pos('~', (11, 0));
     // lcd.write_char_to_pos('~', (11, 1));
 
@@ -211,7 +193,7 @@ fn update_deck_display(state: &DeckState,lcd: &mut LocalDisplay) {
             // state.viewers.numtoa_str(10, &mut buffer)
             state.viewers.as_str()
         } else {
-            "999"
+            "---"
         },
         (8, 0),
     );
@@ -224,20 +206,35 @@ fn update_deck_display(state: &DeckState,lcd: &mut LocalDisplay) {
             // state.followers.numtoa_str(10, &mut buffer)
             state.followers.as_str()
         } else {
-            "999"
+            "---"
         },
         (8, 1),
     );
 
+    //TODO:Time
+    // lcd.write_str_to_pos(
+    //     "0",
+    //     // if state.viewers.len() == 3 {
+    //         // state.followers.numtoa_str(10, &mut buffer)
+    //         // state.followers.as_str("0")
+    //     // } else {
+    //         // "---"
+    //     // },
+    //     (12, 0),
+    // );
+    // lcd.write_char_to_pos(':', (13, 0));
+    // lcd.write_char_to_pos('0', (14, 0));
+    // lcd.write_char_to_pos('0', (15, 0));
+
     //Placeholder
-    // lcd.write_char_to_pos('~', (12, 1));
-    // lcd.write_char_to_pos('~', (13, 1));
-    // lcd.write_char_to_pos('~', (14, 1));
-    // lcd.write_char_to_pos('~', (15, 1));
-    // lcd.write_char_to_pos('~', (12, 0));
-    // lcd.write_char_to_pos('~', (13, 0));
-    // lcd.write_char_to_pos('~', (14, 0));
-    // lcd.write_char_to_pos('~', (15, 0));
+    lcd.write_char_to_pos('~', (12, 1));
+    lcd.write_char_to_pos('~', (13, 1));
+    lcd.write_char_to_pos('~', (14, 1));
+    lcd.write_char_to_pos('~', (15, 1));
+    lcd.write_char_to_pos('~', (12, 0));
+    lcd.write_char_to_pos('~', (13, 0));
+    lcd.write_char_to_pos('~', (14, 0));
+    lcd.write_char_to_pos('~', (15, 0));
 }
 
 fn set_button_led(is_micro_on: bool, button_led: &mut Pin<Output, arduino_hal::port::D2>) {
@@ -254,100 +251,18 @@ fn read_serial(data: u8, state: &mut DeckState, serial: &mut Usart0<DefaultClock
     uwriteln!(serial, "u8: {}", data).unwrap();
     uwriteln!(serial, "Char: {}", data_char.as_str()).unwrap();
     uwriteln!(serial, "").unwrap();
-
-    // state.update(DeckState {
-    //     is_live: true,
-    //     is_micro_on: !state.is_micro_on,
-    //     followers: state.followers,
-    //     viewers: state.viewers,
-    // });
 }
 
 fn send_button_signal() {}
 
-// #[interrupt()]
-// fn UART4() {
-//     // Check RX register and drain into queue
-//     while let Ok(byte) = uart.read() {
-//         // Push byte to queue; drop on overflow
-//         let _ = unsafe { RX_QUEUE.enqueue(byte) };
-//     }
-// }
-
-
-// #[avr_device::interrupt(atmega328p)]
-// fn USART_RX(){
-//     interrupt::free(|cs|{
-//         let mut serial = SERIAL.borrow(cs).take().unwrap();
-//         let byte = serial.read().unwrap();
-//     uwriteln!(serial, "--DATA--: {}", &byte.as_ascii().unwrap().as_str()).unwrap();
-//     SERIAL.borrow(cs).replace(Some(serial));
-
-//        // DECK_STATE.borrow(cs).set(DeckState { is_micro_on: true, is_live: true, viewers: 999, followers: 22 });
-//     });
-
-//     // let mut serial = SERIAL.into_inner().into_inner().unwrap();
-
-//     // uwriteln!(serial, "--Init--").unwrap();
-
-//     // interrupt::free(f)
-//     //
-// //         let dp = arduino_hal::Peripherals::take().unwrap();
-// //     let mut pins = arduino_hal::pins!(dp);
-// //     let mut rx = pins.d1.into_output();
-// //     // let mut serial: Usart0<DefaultClock> = arduino_hal::default_serial!(dp, pins, 115200);
-// //     // let mut usart: Usart0<DefaultClock> = arduino_hal::Usart::new(dp.USART0, pins.d0, rx, arduino_hal::hal::usart::BaudrateExt::into_baudrate(115200));
-// //     let mut serial: Usart0<DefaultClock> = arduino_hal::Usart::new(dp.USART0, pins.d0, rx, arduino_hal::hal::usart::BaudrateExt::into_baudrate(115200));
-
-// // let bytes = serial.read().unwrap_or(0);
-
-// // uwriteln!(&mut serial, "--INTERUPT--:: {}", bytes).unwrap();
-
-
-
-//     // interrupt::free(|cr|{
-
-//     // });
-// }
-
-
-
 #[arduino_hal::entry]
 fn main() -> ! {
     let mut state = DeckState::default();
-    // let number_to_string_buffer = [0u8; 20]; //Number -> String buffer
     let dp = arduino_hal::Peripherals::take().unwrap();
     let pins = arduino_hal::pins!(dp);
     let rx = pins.d1.into_output();
-    // let mut serial: Usart0<DefaultClock> = arduino_hal::default_serial!(dp, pins, 115200);
-    // let mut usart: Usart0<DefaultClock> = arduino_hal::Usart::new(dp.USART0, pins.d0, rx, arduino_hal::hal::usart::BaudrateExt::into_baudrate(115200));
     let mut serial: Usart0<DefaultClock> = arduino_hal::Usart::new(dp.USART0, pins.d0, rx, arduino_hal::hal::usart::BaudrateExt::into_baudrate(BAUDRATE));
     let mut string_buffer = String::<3>::new();
-    let mut string_slice_buffer: [u8; 3] = [0u8; 3];
-
-    // serial.listen(Event::DataRegisterEmpty);
-    // serial.listen(Event::TxComplete);
-
-    // SAFETY: We can enable the interrupts here as we are not inside
-     // a critical section.
-    // SERIAL.into_inner().set(serial.into());
-    //
-    //
-    // serial.listen(Event::RxComplete);
-    //     interrupt::free(|cs| {
-    //        SERIAL.borrow(cs).replace(Some(serial));
-    //     });
-
-
-
-
-      // let mut serial =  Option::None;
-
-     // interrupt::free(|cs| {
-     //    SERIAL.borrow(cs).set(Option::Some(serial));
-     //    });
-
-    // SERIAL = Option::Ok(serial);
 
     let mut led = pins.d13.into_output(); //Arduino led
                                           // let (reader, writer) = &serial.split();
@@ -389,116 +304,32 @@ fn main() -> ! {
     let mut read_buffer: Vec<u8, 128> = Vec::<_, 128>::new();
     let mut is_transmiting = false;
 
-
-
-    // unsafe {
-    //     avr_device::interrupt::enable();
-    // }
-
-
-
     loop {
-
-        // let byte = serial.read().unwrap_or(0);
-        // if byte !=0 {
-    // uwriteln!(serial, "--DATA--: {}", &byte.as_ascii().unwrap().as_str()).unwrap();
-    // serial.flush();
-        // }
-        // loop {
-            // let byte = serial.read().unwrap_or(0);
-
-            // if byte == 0 {
-            //     break;
-            // }
-
-
-        //     match byte {
-        //         // VIEWERS_BYTE => {
-        //         //     uwriteln!(&mut serial, "{}", byte.as_ascii().unwrap().as_str()).unwrap();
-        //         //     serial.flush();
-
-        //         //     is_transmiting = true;
-        //         // }
-        //         //
-        //         OPEN_TRANSITION_BYTE => {
-        //             uwriteln!(&mut serial, "{}", byte.as_ascii().unwrap().as_str()).unwrap();
-        //             serial.flush();
-
-        //             is_transmiting = true;
-        //         }
-        //         CLOSE_TRANSITION_BYTE => {
-        //             uwriteln!(&mut serial, "CLOSE TRANS").unwrap();
-        //             serial.flush();
-
-        //             is_transmiting = false;
-        //             break;
-        //         }
-        //         _ => (),
-        //     }
-
-        //     if (is_transmiting) {
-        //         if (byte != 0) {
-        //             uwriteln!(&mut serial, "write to buffer: {}", byte.as_ascii().unwrap().as_str()).unwrap();
-        //             serial.flush();
-
-        //             uwriteln!(&mut serial, "|-- {}", byte).unwrap();
-        //             serial.flush();
-
-        //             if read_buffer.push(byte).is_err() {
-        //                 uwriteln!(&mut serial, "error: buffer full\r\n").unwrap();
-        //             }
-        //         }
-        //     }
-        // }
-
         match serial.read() {
             Ok(byte) => {
-                serial.flush();
-
                 match byte {
                     OPEN_TRANSITION_BYTE => {
-                        uwriteln!(&mut serial, "OPEN TRANSMITION, {}", byte.as_ascii().unwrap().as_str()).unwrap();
-                               serial.flush();
                         is_transmiting = true;
                     }
                     CLOSE_TRANSITION_BYTE => {
-                        uwriteln!(&mut serial, "CLOSE TRANSMITION").unwrap();
-
                         is_transmiting = false;
                     }
                     _ => (),
                 }
 
                 if is_transmiting {
-                uwriteln!(&mut serial, "TO BUFF-> : {}", byte.as_ascii().unwrap().as_str()).unwrap();
-                           serial.flush();
-
-                    if read_buffer.push(byte).is_err() {
-                        uwriteln!(&mut serial, "error: buffer full\r\n").unwrap();
-                               serial.flush();
-                    }
+                    if read_buffer.push(byte).is_err() {}
                 }
             }
             Err(_) => {
-                // uwriteln!(&mut serial, "ERROR TRANSMITION").unwrap();
-
-                // is_transmiting = false;
             }
         }
 
-
-
-
         //Protocol interpretation
         if !is_transmiting && read_buffer.len() > 0 {
-            // let buffer_string= &read_buffer.into_iter().map(|b|{b.as_ascii().unwrap()});
-            // let buffer_string_2:String<128> = buffer_string.collect();
             let mut i = 0;
-            // uwriteln!(&mut serial, "i= {}",i).unwrap();
 
             for byte in &read_buffer {
-                uwriteln!(&mut serial, "interpret: {}", byte.as_ascii().unwrap().as_str()).unwrap();
-
                 match byte {
                     &MICROPHONE_BYTE=>{
                         let next_byte = read_buffer[i+1];
@@ -539,95 +370,43 @@ fn main() -> ! {
                     }
                     _ => (),
                 }
-                // uwriteln!(&mut serial, "+READ BUFFER").unwrap();
-                // uwriteln!(&mut serial, "READ BUFFER: {}", byte.as_ascii().unwrap().as_str()).unwrap();
                 i = i+1;
             }
-                // uwriteln!(&mut serial, "+++++END+").unwrap();
             read_buffer.clear();
-
-            uwriteln!(&mut serial, "STATE MIC: {}", state.is_micro_on).unwrap();
-
-            // update_deck_display(&mut state, &mut lcd);
             i = 0;
-
-        //State listener
-        // if(state.is_micro_on && !button_led.is_set_low()){
-        //     uwriteln!(&mut serial, "set micro low").unwrap();
-
-        //     button_led.set_low();
-        // }
-
-        // if(!state.is_micro_on && button_led.is_set_low()){
-        //     uwriteln!(&mut serial, "set micro high").unwrap();
-
-        //     button_led.set_high();
-        // }
-
         }
-
 
         if button_3.is_low() {
-        //     if i < 999 {
-        //         i = i + 2;
-        //     }
-
-        //     if j < 999 {
-        //         j = j + 1;
-        //     }
-
-        //     state.update(DeckState {
-        //         is_live: true,
-        //         is_micro_on: true,
-        //         followers: state.followers + 1,
-        //         viewers: state.viewers + 1,
-        //     });
-        // } else {
-        //     state.update(DeckState {
-        //         is_live: state.is_live,
-        //         is_micro_on: false,
-        //         followers: state.followers,
-        //         viewers: state.viewers,
-        //     });
-        // }
+            serial.write_str("B3").unwrap();
+            serial.flush();
         }
         if button_4.is_low() {
-            // uwriteln!(&mut serial, "BUTTON 4 - on").unwrap();
-            // uwriteln!(&mut serial, "word: {} || bytes: {}", res, res_bytes[0]).unwrap();
-            // serial.write(0x35);
+            serial.write_str("B4").unwrap();
+            serial.flush();
         }
         if button_5.is_low() {
-            // uwriteln!(&mut serial, "BUTTON 5 - on").unwrap();
-            // serial.write(0x35);
-            // uwriteln!(&mut serial, "buffer len: {}", read_buffer.len()).unwrap();
+            serial.write_str("B5").unwrap();
+            serial.flush();
         }
         if button_6.is_low() {
-            // uwriteln!(&mut serial, "BUTTON 6 - on").unwrap();
-            // serial.write(0x36);
+            serial.write_str("B6").unwrap();
+            serial.flush();
         }
         if button_7.is_low() {
-            // uwriteln!(&mut serial, "BUTTON 7 - on").unwrap();
-            // serial.write(0x37);
+            serial.write_str("B7").unwrap();
+            serial.flush();
         }
         if button_8.is_low() {
-            // uwriteln!(&mut serial, "BUTTON 8 - on").unwrap();
-            // serial.write(0x38);
+            serial.write_str("B8").unwrap();
+            serial.flush();
+
         }
         if button_9.is_low() {
-            // uwriteln!(&mut serial, "BUTTON 9 - on").unwrap();
-            // serial.write(0x39);
+            serial.write_str("B9").unwrap();
+            serial.flush();
         }
 
         update_deck_display(&mut state, &mut lcd);
         set_button_led(state.is_micro_on, &mut button_led);
-
-        // if read_buffer.len() <= 13 {
-        //     read_buffer.clear();
-        // }
-        //
-        // SERIAL.borrow(cs).replace(Some(serial));
-        //
-
-     // });
     }
 }
