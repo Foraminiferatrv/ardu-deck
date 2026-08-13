@@ -299,6 +299,16 @@ fn main() -> ! {
     let button_8 = pins.d8.into_pull_up_input();
     let button_9 = pins.d9.into_pull_up_input();
 
+    //Debounce states
+    let mut is_mic_button_pressed = false;
+
+    let mut is_button_4_pressed = false;
+    let mut is_button_5_pressed = false;
+    let mut is_button_6_pressed = false;
+    let mut is_button_7_pressed = false;
+    let mut is_button_8_pressed = false;
+    let mut is_button_9_pressed = false;
+
     led.toggle();
 
     let mut read_buffer: Vec<u8, 128> = Vec::<_, 128>::new();
@@ -376,35 +386,83 @@ fn main() -> ! {
             i = 0;
         }
 
-        if button_3.is_low() {
-            serial.write_str("B3").unwrap();
-            serial.flush();
-        }
-        if button_4.is_low() {
-            serial.write_str("B4").unwrap();
-            serial.flush();
-        }
-        if button_5.is_low() {
-            serial.write_str("B5").unwrap();
-            serial.flush();
-        }
-        if button_6.is_low() {
-            serial.write_str("B6").unwrap();
-            serial.flush();
-        }
-        if button_7.is_low() {
-            serial.write_str("B7").unwrap();
-            serial.flush();
-        }
-        if button_8.is_low() {
-            serial.write_str("B8").unwrap();
-            serial.flush();
 
-        }
-        if button_9.is_low() {
-            serial.write_str("B9").unwrap();
+        let mic_button_state = button_3.is_low();
+
+      if is_mic_button_pressed != mic_button_state{
+            serial.write_str(if mic_button_state{"B3:1"} else {"B3:0"}).unwrap();
             serial.flush();
+            // is_mic_button_pressed = true;
+        };
+
+        //Mic button
+        if mic_button_state {
+            is_mic_button_pressed = true;
+        } else {
+            is_mic_button_pressed = false;
+            // serial.write_str("B3:0").unwrap();
         }
+
+        if button_4.is_low() {
+            if !is_button_4_pressed {
+                serial.write_str("B4").unwrap();
+                serial.flush();
+                is_button_4_pressed = true;
+            }
+        } else {
+            is_button_4_pressed = false;
+        }
+
+        if button_5.is_low() {
+            if !is_button_5_pressed {
+                serial.write_str("B5").unwrap();
+                serial.flush();
+                is_button_5_pressed = true;
+            }
+        } else {
+            is_button_5_pressed = false;
+        }
+
+        if button_6.is_low() {
+            if !is_button_6_pressed {
+                serial.write_str("B6").unwrap();
+                serial.flush();
+                is_button_6_pressed = true;
+            }
+        } else {
+            is_button_6_pressed = false;
+        }
+
+        if button_7.is_low() {
+            if !is_button_7_pressed {
+                serial.write_str("B7").unwrap();
+                serial.flush();
+                is_button_7_pressed = true;
+            }
+        } else {
+            is_button_7_pressed = false;
+        }
+
+        if button_8.is_low() {
+            if !is_button_8_pressed {
+                serial.write_str("B8").unwrap();
+                serial.flush();
+                is_button_8_pressed = true;
+            }
+        } else {
+            is_button_8_pressed = false;
+        }
+
+        if button_9.is_low() {
+            if !is_button_9_pressed {
+                serial.write_str("B9").unwrap();
+                serial.flush();
+                is_button_9_pressed = true;
+            }
+        } else {
+            is_button_9_pressed = false;
+        }
+
 
         update_deck_display(&mut state, &mut lcd);
         set_button_led(state.is_micro_on, &mut button_led);
