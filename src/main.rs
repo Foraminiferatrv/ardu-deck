@@ -141,13 +141,8 @@ impl DeckState {
         *self = new_state
     }
 
-    fn toggle_micro(&mut self) {
-        self.is_micro_on = !self.is_micro_on;
-    }
-
     fn set_micro(&mut self, new_val: bool) {
         self.is_micro_on = new_val;
-         // self = DeckState{is_micro_on:new_val, .self}
     }
 
     fn set_live(&mut self, new_val: bool) {
@@ -162,8 +157,6 @@ impl DeckState {
         self.followers = new_val.clone();
     }
 }
-
-// fn listen_state(state: &DeckState,lcd: &mut LocalDisplay, )
 
 
 fn update_deck_display(state: &DeckState,lcd: &mut LocalDisplay) {
