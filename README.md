@@ -3,6 +3,8 @@ ardu-deck
 
 Extremely cheep and simple Arduino Nano DIY stream deck firmware.
 
+No AI is used in writing this code.
+
 ## Build Instructions
 1. Install prerequisites as described in the [`avr-hal` README] (`avr-gcc`, `avr-libc`, `avrdude`, [`ravedude`]).
 
